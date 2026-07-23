@@ -414,6 +414,12 @@ table tr:last-child td {
     padding: 0;
     max-width: 100%;
   }
+  .card {
+    border: none;
+    padding: 0;
+    background: transparent;
+    margin-bottom: 0;
+  }
   .doc {
     border: none;
   }

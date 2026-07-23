@@ -219,7 +219,7 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
 
   return (
     <>
-      <div className="card">
+      <div className="card no-print">
         <h2>1. Cliente</h2>
         <div className="row">
           <div className="field" style={{ minWidth: 260 }}>
@@ -270,7 +270,7 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
         </div>
       </div>
 
-      <div className="card">
+      <div className="card no-print">
         <h2>2. Notas Fiscais</h2>
         <NfUploadDropzone clienteId={cliente.id} onAdded={handleNfAdded} />
         <div style={{ marginTop: 12 }}>
@@ -288,7 +288,7 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
       </div>
 
       {notas.length > 0 && (
-        <div className="card">
+        <div className="card no-print">
           <h2>3. Custos fixos deste demonstrativo</h2>
           <div className="hint" style={{ marginBottom: 10 }}>
             Marque só o que deve ser descontado neste demonstrativo. Dá para editar valores, desmarcar itens ou
@@ -338,11 +338,13 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
 
       {notas.length > 0 && (
         <div className="card">
-          <h2>4. Demonstrativo</h2>
-          <div className="actions-bar">
-            <button className="btn orange" onClick={handleCalcular}>
-              Calcular demonstrativo
-            </button>
+          <div className="no-print">
+            <h2>4. Demonstrativo</h2>
+            <div className="actions-bar">
+              <button className="btn orange" onClick={handleCalcular}>
+                Calcular demonstrativo
+              </button>
+            </div>
           </div>
 
           {resultados && resultados.length > 0 && (
@@ -379,7 +381,7 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
         </div>
       )}
 
-      {toast && <div className="toast show">{toast}</div>}
+      {toast && <div className="toast show no-print">{toast}</div>}
     </>
   );
 }

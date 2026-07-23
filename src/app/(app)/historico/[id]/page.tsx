@@ -20,7 +20,7 @@ export default async function HistoricoDetalhePage({ params }: { params: Promise
 
   return (
     <div className="card">
-      <h2>Demonstrativo salvo</h2>
+      <h2 className="no-print">Demonstrativo salvo</h2>
       <DemonstrativoDocument cliente={view.cliente} resultado={view.resultado} custosUsados={view.custosUsados} />
       <div className="actions-bar no-print" style={{ marginTop: 14 }}>
         <HistoricoDetalheActions />
