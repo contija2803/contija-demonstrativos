@@ -22,9 +22,7 @@ export function DemonstrativoDocument({ cliente, resultado: r, custosUsados }: D
     <div className="doc" id="demoDoc">
       <div className="doc-head">
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ background: "#fff", borderRadius: 8, padding: "4px 8px" }}>
-            <Image src="/logo-contija.png" alt="Contija Contabilidade" width={90} height={0} style={{ height: "auto" }} />
-          </div>
+          <Image src="/logo-contija.png" alt="Contija Contabilidade" width={90} height={0} style={{ height: "auto" }} />
           <h3>DEMONSTRATIVO DE PAGAMENTO</h3>
         </div>
         <div style={{ fontSize: 11, opacity: 0.85 }}>{isSimples ? "Simples Nacional" : "Lucro Presumido"}</div>
