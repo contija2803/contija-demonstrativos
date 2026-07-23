@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { parseNfseFiles } from "@/lib/xml/parserNfse";
+import { parseNfseCsvFiles } from "@/lib/csv/parserNfseCsv";
 import type { NotaFiscalJSON } from "@/lib/serialize";
 
 interface Props {
@@ -17,12 +17,12 @@ export function NfUploadDropzone({ clienteId, onAdded }: Props) {
 
   async function handleFiles(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
-    const files = Array.from(fileList).filter((f) => f.name.toLowerCase().endsWith(".xml"));
+    const files = Array.from(fileList).filter((f) => f.name.toLowerCase().endsWith(".csv"));
     if (!files.length) return;
 
     setBusy(true);
     try {
-      const { notas, lidos, comErro, canceladas } = await parseNfseFiles(files);
+      const { notas, lidos, comErro, canceladas } = await parseNfseCsvFiles(files);
 
       let addedCount = 0;
       if (notas.length) {
@@ -39,7 +39,7 @@ export function NfUploadDropzone({ clienteId, onAdded }: Props) {
       }
 
       setNote({
-        text: `${lidos} NF(s) lida(s)${canceladas ? ", " + canceladas + " possivelmente cancelada(s) — vieram desmarcadas na tabela, confira antes de incluir" : ""}${comErro ? ", " + comErro + " arquivo(s) com erro (adicione manualmente)" : ""}. Cada prefeitura usa um layout de XML diferente — confira os valores extraídos na tabela abaixo antes de calcular.`,
+        text: `${lidos} NF(s) lida(s)${canceladas ? ", " + canceladas + " cancelada(s) — vieram desmarcadas na tabela, confira antes de incluir" : ""}${comErro ? ", " + comErro + " arquivo(s) com erro (adicione manualmente)" : ""}. Confira os valores extraídos na tabela abaixo antes de calcular.`,
         warn: comErro > 0 || addedCount === 0,
       });
     } finally {
@@ -65,14 +65,14 @@ export function NfUploadDropzone({ clienteId, onAdded }: Props) {
         }}
       >
         <div>
-          <b>{busy ? "Processando…" : "Arraste os arquivos XML da NF aqui"}</b> ou clique para selecionar
+          <b>{busy ? "Processando…" : "Arraste o arquivo CSV de NFs aqui"}</b> ou clique para selecionar
         </div>
-        <div className="hint">Aceita um ou vários XMLs de NFS-e ao mesmo tempo</div>
+        <div className="hint">Aceita um ou vários CSVs de NFS-e ao mesmo tempo</div>
         <input
           ref={inputRef}
           type="file"
           multiple
-          accept=".xml"
+          accept=".csv"
           onChange={(e) => handleFiles(e.target.files)}
         />
       </div>
