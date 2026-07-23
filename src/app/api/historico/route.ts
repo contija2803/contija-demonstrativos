@@ -7,7 +7,11 @@ import { calcularDemonstrativo, type ClienteCalcInput, type NotaFiscalCalcInput 
 import type { DemonstrativoView } from "@/components/DemonstrativoDocument";
 
 export async function GET() {
+  const session = await getServerSession(authOptions);
+  const isCliente = session?.user?.role === "CLIENTE";
+
   const historicos = await prisma.historico.findMany({
+    where: isCliente ? { clienteId: session?.user?.clienteId ?? "__none__" } : undefined,
     orderBy: { dataGeracao: "desc" },
     include: { createdByUser: { select: { name: true } } },
   });
@@ -28,6 +32,10 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
+  if (session?.user?.role === "CLIENTE") {
+    return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+  }
+
   const body = await req.json();
   const parsed = salvarHistoricoSchema.safeParse(body);
   if (!parsed.success) {

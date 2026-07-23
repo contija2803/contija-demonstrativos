@@ -6,7 +6,7 @@ import { SignOutButton } from "@/components/SignOutButton";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
-  const isAdmin = session?.user?.role === "ADMIN";
+  const role = (session?.user?.role as "ADMIN" | "STAFF" | "CLIENTE" | undefined) ?? "STAFF";
 
   return (
     <>
@@ -22,7 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
         <SignOutButton />
       </header>
-      <NavTabs isAdmin={isAdmin} />
+      <NavTabs role={role} />
       <main>{children}</main>
     </>
   );

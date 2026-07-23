@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { notasFiscaisBatchSchema } from "@/lib/validation/nota";
 import { serializeNotaFiscal } from "@/lib/serialize";
+import { requireStaffOrAdmin } from "@/lib/requireStaff";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -13,6 +14,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await requireStaffOrAdmin())) return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+
   const { id } = await params;
   const body = await req.json();
   const parsed = notasFiscaisBatchSchema.safeParse(body);

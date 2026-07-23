@@ -16,10 +16,28 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
 
   const users = await prisma.user.findMany({
-    select: { id: true, name: true, email: true, role: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      createdAt: true,
+      clienteId: true,
+      cliente: { select: { empresa: true } },
+    },
     orderBy: { createdAt: "asc" },
   });
-  return NextResponse.json(users);
+  return NextResponse.json(
+    users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      createdAt: u.createdAt,
+      clienteId: u.clienteId,
+      clienteEmpresa: u.cliente?.empresa ?? null,
+    }))
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -44,9 +62,29 @@ export async function POST(req: NextRequest) {
       email: parsed.data.email,
       passwordHash,
       role: parsed.data.role,
+      clienteId: parsed.data.role === "CLIENTE" ? parsed.data.clienteId : null,
     },
-    select: { id: true, name: true, email: true, role: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      createdAt: true,
+      clienteId: true,
+      cliente: { select: { empresa: true } },
+    },
   });
 
-  return NextResponse.json(user, { status: 201 });
+  return NextResponse.json(
+    {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt,
+      clienteId: user.clienteId,
+      clienteEmpresa: user.cliente?.empresa ?? null,
+    },
+    { status: 201 }
+  );
 }

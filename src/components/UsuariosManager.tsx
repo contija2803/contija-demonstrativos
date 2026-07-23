@@ -6,28 +6,51 @@ export interface UserItem {
   id: string;
   name: string;
   email: string;
-  role: "ADMIN" | "STAFF";
+  role: "ADMIN" | "STAFF" | "CLIENTE";
   createdAt: string;
+  clienteId: string | null;
+  clienteEmpresa: string | null;
 }
 
-export function UsuariosManager({ initialUsers, currentUserId }: { initialUsers: UserItem[]; currentUserId: string }) {
+const ROLE_LABEL: Record<UserItem["role"], string> = {
+  ADMIN: "Administrador",
+  STAFF: "Equipe",
+  CLIENTE: "Cliente",
+};
+
+export function UsuariosManager({
+  initialUsers,
+  currentUserId,
+  clientesLista,
+}: {
+  initialUsers: UserItem[];
+  currentUserId: string;
+  clientesLista: { id: string; empresa: string }[];
+}) {
   const [users, setUsers] = useState(initialUsers);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"ADMIN" | "STAFF">("STAFF");
+  const [role, setRole] = useState<UserItem["role"]>("STAFF");
+  const [clienteId, setClienteId] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (role === "CLIENTE" && !clienteId) {
+      setError("Selecione a empresa que este usuário poderá visualizar.");
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, role }),
+        body: JSON.stringify({ name, email, password, role, clienteId: role === "CLIENTE" ? clienteId : null }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -39,6 +62,7 @@ export function UsuariosManager({ initialUsers, currentUserId }: { initialUsers:
       setEmail("");
       setPassword("");
       setRole("STAFF");
+      setClienteId("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
     } finally {
@@ -75,11 +99,26 @@ export function UsuariosManager({ initialUsers, currentUserId }: { initialUsers:
             </div>
             <div className="field">
               <label>Papel</label>
-              <select value={role} onChange={(e) => setRole(e.target.value as "ADMIN" | "STAFF")}>
+              <select value={role} onChange={(e) => setRole(e.target.value as UserItem["role"])}>
                 <option value="STAFF">Equipe</option>
                 <option value="ADMIN">Administrador</option>
+                <option value="CLIENTE">Cliente</option>
               </select>
             </div>
+            {role === "CLIENTE" && (
+              <div className="field">
+                <label>Empresa vinculada</label>
+                <select value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
+                  <option value="">Selecione a empresa…</option>
+                  {clientesLista.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.empresa}
+                    </option>
+                  ))}
+                </select>
+                <div className="hint">Este usuário só verá o histórico desta empresa.</div>
+              </div>
+            )}
           </div>
           <button type="submit" className="btn orange" disabled={saving}>
             {saving ? "Criando…" : "Criar usuário"}
@@ -95,6 +134,7 @@ export function UsuariosManager({ initialUsers, currentUserId }: { initialUsers:
               <th>Nome</th>
               <th>E-mail</th>
               <th>Papel</th>
+              <th>Empresa</th>
               <th></th>
             </tr>
           </thead>
@@ -103,7 +143,8 @@ export function UsuariosManager({ initialUsers, currentUserId }: { initialUsers:
               <tr key={u.id}>
                 <td>{u.name}</td>
                 <td>{u.email}</td>
-                <td>{u.role === "ADMIN" ? "Administrador" : "Equipe"}</td>
+                <td>{ROLE_LABEL[u.role]}</td>
+                <td>{u.clienteEmpresa ?? "—"}</td>
                 <td>
                   {u.id !== currentUserId && (
                     <button className="btn danger" onClick={() => handleDelete(u.id)}>

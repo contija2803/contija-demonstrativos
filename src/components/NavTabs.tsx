@@ -3,15 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export function NavTabs({ isAdmin }: { isAdmin: boolean }) {
+export function NavTabs({ role }: { role: "ADMIN" | "STAFF" | "CLIENTE" }) {
   const pathname = usePathname();
 
-  const tabs = [
-    { href: "/gerar", label: "Gerar Demonstrativo" },
-    { href: "/clientes", label: "Clientes" },
-    { href: "/historico", label: "Histórico" },
-    ...(isAdmin ? [{ href: "/usuarios", label: "Usuários" }] : []),
-  ];
+  const tabs =
+    role === "CLIENTE"
+      ? [{ href: "/historico", label: "Meu Histórico" }]
+      : [
+          { href: "/gerar", label: "Gerar Demonstrativo" },
+          { href: "/clientes", label: "Clientes" },
+          { href: "/historico", label: "Histórico" },
+          ...(role === "ADMIN" ? [{ href: "/usuarios", label: "Usuários" }] : []),
+        ];
 
   return (
     <nav className="tabs">

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { clienteInputSchema } from "@/lib/validation/cliente";
 import { serializeCliente } from "@/lib/serialize";
+import { requireStaffOrAdmin } from "@/lib/requireStaff";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -14,6 +15,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await requireStaffOrAdmin())) return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+
   const { id } = await params;
   const body = await req.json();
   const parsed = clienteInputSchema.safeParse(body);
@@ -39,6 +42,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await requireStaffOrAdmin())) return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+
   const { id } = await params;
   await prisma.cliente.delete({ where: { id } });
   return NextResponse.json({ ok: true });

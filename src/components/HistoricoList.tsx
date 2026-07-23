@@ -29,7 +29,13 @@ const MESES = [
   "dezembro",
 ];
 
-export function HistoricoList({ itens: itensIniciais }: { itens: HistoricoItem[] }) {
+export function HistoricoList({
+  itens: itensIniciais,
+  canDelete = true,
+}: {
+  itens: HistoricoItem[];
+  canDelete?: boolean;
+}) {
   const router = useRouter();
   const [itens, setItens] = useState(itensIniciais);
 
@@ -91,9 +97,11 @@ export function HistoricoList({ itens: itensIniciais }: { itens: HistoricoItem[]
                       <button className="btn ghost small" onClick={() => router.push(`/historico/${h.id}`)}>
                         Ver
                       </button>{" "}
-                      <button className="btn danger" onClick={() => handleExcluir(h.id)}>
-                        Excluir
-                      </button>
+                      {canDelete && (
+                        <button className="btn danger" onClick={() => handleExcluir(h.id)}>
+                          Excluir
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

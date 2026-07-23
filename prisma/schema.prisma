@@ -26,6 +26,7 @@ enum StatusNf {
 enum UserRole {
   ADMIN
   STAFF
+  CLIENTE
 }
 
 model User {
@@ -36,6 +37,10 @@ model User {
   role         UserRole    @default(STAFF)
   createdAt    DateTime    @default(now())
   historicos   Historico[]
+
+  // Só usado quando role = CLIENTE: restringe o acesso a uma única empresa.
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
 }
 
 model Cliente {
@@ -47,9 +52,10 @@ model Cliente {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  custosFixos   CustoFixo[]
-  notasFiscais  NotaFiscal[]
-  historicos    Historico[]
+  custosFixos      CustoFixo[]
+  notasFiscais     NotaFiscal[]
+  historicos       Historico[]
+  usuariosClientes User[]
 }
 
 model CustoFixo {

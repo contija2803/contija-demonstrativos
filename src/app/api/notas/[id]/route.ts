@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { notaFiscalPatchSchema } from "@/lib/validation/nota";
 import { serializeNotaFiscal } from "@/lib/serialize";
+import { requireStaffOrAdmin } from "@/lib/requireStaff";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await requireStaffOrAdmin())) return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+
   const { id } = await params;
   const body = await req.json();
   const parsed = notaFiscalPatchSchema.safeParse(body);
@@ -16,6 +19,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await requireStaffOrAdmin())) return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+
   const { id } = await params;
   await prisma.notaFiscal.delete({ where: { id } });
   return NextResponse.json({ ok: true });
