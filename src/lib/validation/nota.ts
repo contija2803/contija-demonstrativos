@@ -12,6 +12,7 @@ export const notaFiscalDraftSchema = z.object({
   origem: z.enum(["NOVO", "PENDENTE_ANTERIOR"]).default("NOVO"),
   cancelada: z.boolean().default(false),
   descricao: z.string().optional(),
+  tipoTomador: z.enum(["PF", "PJ"]).nullable().optional(),
 });
 
 export const notasFiscaisBatchSchema = z.object({

@@ -6,6 +6,7 @@ import type { ClienteJSON } from "@/lib/serialize";
 interface CustoFixoDraft {
   desc: string;
   valor: number;
+  socioId: string | null;
 }
 
 interface SocioDraft {
@@ -20,7 +21,7 @@ interface Props {
 }
 
 function toDrafts(cliente: ClienteJSON | null): CustoFixoDraft[] {
-  return cliente ? cliente.custosFixos.map((cf) => ({ desc: cf.desc, valor: cf.valor })) : [];
+  return cliente ? cliente.custosFixos.map((cf) => ({ desc: cf.desc, valor: cf.valor, socioId: cf.socioId })) : [];
 }
 
 function toSocioDrafts(cliente: ClienteJSON | null): SocioDraft[] {
@@ -38,6 +39,10 @@ export function ClienteForm({ initial, onSaved, onCancel }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Só sócios já salvos (com id) podem receber um custo fixo específico —
+  // um sócio recém-digitado neste mesmo formulário ainda não existe no banco.
+  const sociosComId = socios.filter((s): s is { id: string; nome: string } => !!s.id);
+
   useEffect(() => {
     setEmpresa(initial?.empresa ?? "");
     setSocios(toSocioDrafts(initial));
@@ -48,7 +53,12 @@ export function ClienteForm({ initial, onSaved, onCancel }: Props) {
 
   function updateCusto(index: number, field: keyof CustoFixoDraft, value: string) {
     setCustosFixos((prev) =>
-      prev.map((c, i) => (i === index ? { ...c, [field]: field === "valor" ? Number(value) || 0 : value } : c))
+      prev.map((c, i) => {
+        if (i !== index) return c;
+        if (field === "valor") return { ...c, valor: Number(value) || 0 };
+        if (field === "socioId") return { ...c, socioId: value || null };
+        return { ...c, [field]: value };
+      })
     );
   }
 
@@ -88,7 +98,9 @@ export function ClienteForm({ initial, onSaved, onCancel }: Props) {
       empresa: empresa.trim(),
       regime,
       aliquotaSimplesMensal: regime === "SIMPLES" ? Number(aliquotaSimplesMensal) : null,
-      custosFixos: custosFixos.filter((c) => c.desc.trim()),
+      custosFixos: custosFixos
+        .filter((c) => c.desc.trim())
+        .map((c) => ({ desc: c.desc, valor: c.valor, socioId: c.socioId })),
       socios: sociosValidos.map((s) => ({ id: s.id, nome: s.nome.trim() })),
     };
 
@@ -193,6 +205,12 @@ export function ClienteForm({ initial, onSaved, onCancel }: Props) {
         </button>
 
         <h3>Custos fixos mensais</h3>
+        {sociosComId.length > 1 && (
+          <div className="hint" style={{ marginBottom: 8 }}>
+            Cada custo pode ser dividido entre todos os sócios, ou descontado só de um sócio específico (ex.: plano
+            de saúde individual).
+          </div>
+        )}
         {custosFixos.map((cf, i) => (
           <div className="custos-line" key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
             <input
@@ -209,12 +227,30 @@ export function ClienteForm({ initial, onSaved, onCancel }: Props) {
               value={cf.valor}
               onChange={(e) => updateCusto(i, "valor", e.target.value)}
             />
+            {sociosComId.length > 1 && (
+              <select
+                style={{ width: 200 }}
+                value={cf.socioId ?? ""}
+                onChange={(e) => updateCusto(i, "socioId", e.target.value)}
+              >
+                <option value="">Dividido entre todos os sócios</option>
+                {sociosComId.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    Só de: {s.nome}
+                  </option>
+                ))}
+              </select>
+            )}
             <button type="button" className="btn danger" onClick={() => removeCusto(i)}>
               Remover
             </button>
           </div>
         ))}
-        <button type="button" className="btn ghost small" onClick={() => setCustosFixos((prev) => [...prev, { desc: "", valor: 0 }])}>
+        <button
+          type="button"
+          className="btn ghost small"
+          onClick={() => setCustosFixos((prev) => [...prev, { desc: "", valor: 0, socioId: null }])}
+        >
           + Adicionar custo fixo
         </button>
 

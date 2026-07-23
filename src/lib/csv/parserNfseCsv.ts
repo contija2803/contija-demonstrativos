@@ -17,6 +17,7 @@ export interface NotaFiscalCsvDraft {
   origem: "NOVO";
   cancelada: boolean;
   descricao: string;
+  tipoTomador: "PF" | "PJ" | undefined;
 }
 
 // Índices de coluna (base 0) do layout confirmado.
@@ -29,6 +30,7 @@ const COL = {
   ALIQUOTA: 29,
   ISS_RETIDO: 32,
   IRPJ: 36,
+  INDICADOR_TOMADOR: 38,
   TOMADOR: 42,
   DISCRIMINACAO: 52,
 } as const;
@@ -87,6 +89,10 @@ export function parseNfeCsv(csvText: string): NotaFiscalCsvDraft[] {
     const dataHora = campos[COL.DATA_HORA]?.trim() ?? "";
     const data = dataHora.split(" ")[0] ?? "";
 
+    const indicadorTomador = campos[COL.INDICADOR_TOMADOR]?.trim();
+    const tipoTomador: "PF" | "PJ" | undefined =
+      indicadorTomador === "1" ? "PF" : indicadorTomador === "2" ? "PJ" : undefined;
+
     notas.push({
       tomador: campos[COL.TOMADOR]?.trim() ?? "",
       prestador: campos[COL.PRESTADOR]?.trim() ?? "",
@@ -99,6 +105,7 @@ export function parseNfeCsv(csvText: string): NotaFiscalCsvDraft[] {
       origem: "NOVO",
       cancelada,
       descricao: campos[COL.DISCRIMINACAO]?.trim() ?? "",
+      tipoTomador,
     });
   }
 

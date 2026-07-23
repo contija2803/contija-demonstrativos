@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcularDemonstrativo, calcularDemonstrativosPorSocio } from "./tributos";
+import { calcularDemonstrativo, calcularDemonstrativosPorSocio, agruparPessoasFisicas } from "./tributos";
 
 describe("calcularDemonstrativo", () => {
   it("Lucro Presumido — uma nota, sem custos fixos", () => {
@@ -144,5 +144,63 @@ describe("calcularDemonstrativosPorSocio", () => {
       1
     );
     expect(porSocio.resultado.valorATransferir).toBeCloseTo(direto.valorATransferir, 2);
+  });
+
+  it("custo fixo específico de um sócio não entra na divisão dos demais", () => {
+    const grupos = [
+      { socioId: "s1", socioNome: "Dr. A", notas: [{ id: "nf1", tomador: "X", numero: "1", valorBruto: 1000, irRetPct: 1.5 }] },
+      { socioId: "s2", socioNome: "Dr. B", notas: [{ id: "nf2", tomador: "Y", numero: "2", valorBruto: 1000, irRetPct: 1.5 }] },
+    ];
+    const custos = [
+      { id: "cf1", desc: "Honorário contábil", valor: 400 }, // dividido (sem socioId)
+      { id: "cf2", desc: "Plano de saúde do Dr. A", valor: 300, socioId: "s1" }, // só do Dr. A
+    ];
+    const resultados = calcularDemonstrativosPorSocio({ regime: "PRESUMIDO" }, grupos, custos, 2);
+
+    const drA = resultados.find((r) => r.socioId === "s1")!;
+    const drB = resultados.find((r) => r.socioId === "s2")!;
+
+    // Dr. A: metade do custo dividido (200) + o específico dele (300) = 500
+    expect(drA.resultado.totalCustoFixo).toBeCloseTo(500, 2);
+    // Dr. B: só a metade do custo dividido (200), nada do específico do Dr. A
+    expect(drB.resultado.totalCustoFixo).toBeCloseTo(200, 2);
+  });
+
+  it("agrupa notas de Pessoa Física numa única linha por sócio", () => {
+    const grupos = [
+      {
+        socioId: "s1",
+        socioNome: "Dr. A",
+        notas: [
+          { id: "nf1", tomador: "Paciente 1", numero: "1", valorBruto: 500, irRetPct: 0, tipoTomador: "PF" as const },
+          { id: "nf2", tomador: "Paciente 2", numero: "2", valorBruto: 300, irRetPct: 0, tipoTomador: "PF" as const },
+          { id: "nf3", tomador: "Hospital X", numero: "3", valorBruto: 2000, irRetPct: 1.5, tipoTomador: "PJ" as const },
+        ],
+      },
+    ];
+    const [resultado] = calcularDemonstrativosPorSocio({ regime: "PRESUMIDO" }, grupos, [], 1);
+
+    expect(resultado.resultado.linhas).toHaveLength(2); // 1 PJ individual + 1 PF agrupada
+    const linhaPF = resultado.resultado.linhas.find((l) => l.tipoTomador === "PF")!;
+    const linhaPJ = resultado.resultado.linhas.find((l) => l.tipoTomador === "PJ")!;
+    expect(linhaPF.tomador).toBe("Pessoa Física");
+    expect(linhaPF.vb).toBeCloseTo(800, 2); // 500 + 300
+    expect(linhaPJ.vb).toBeCloseTo(2000, 2);
+
+    // os totais gerais continuam batendo com a soma de todas as notas originais
+    expect(resultado.resultado.totalValorBruto).toBeCloseTo(2800, 2);
+  });
+});
+
+describe("agruparPessoasFisicas", () => {
+  it("não altera o resultado quando não há notas de Pessoa Física", () => {
+    const resultado = calcularDemonstrativo(
+      { regime: "PRESUMIDO" },
+      [{ id: "nf1", tomador: "Hospital X", numero: "1", valorBruto: 1000, irRetPct: 1.5, tipoTomador: "PJ" }],
+      []
+    );
+    const agrupado = agruparPessoasFisicas(resultado);
+    expect(agrupado.linhas).toHaveLength(1);
+    expect(agrupado.linhas[0].tomador).toBe("Hospital X");
   });
 });

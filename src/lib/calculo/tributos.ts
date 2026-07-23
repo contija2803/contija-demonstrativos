@@ -1,6 +1,7 @@
 import Decimal from "decimal.js";
 
 export type Regime = "PRESUMIDO" | "SIMPLES";
+export type TipoTomador = "PF" | "PJ";
 
 // Percentuais fixos do regime de Lucro Presumido (ver protótipo original)
 export const ALIQ_ISS_RET_PRESUMIDO = 0.03;
@@ -19,12 +20,16 @@ export interface NotaFiscalCalcInput {
   irRetPct?: number | null;
   /** % informado na própria nota, ex.: 3 significa 3% (Simples) */
   issRetPct?: number | null;
+  /** Usado só para agrupar notas de Pessoa Física num único item no documento final. */
+  tipoTomador?: TipoTomador | null;
 }
 
 export interface CustoFixoCalcInput {
   id: string;
   desc: string;
   valor: number;
+  /** null/ausente = dividido igualmente entre todos os sócios; preenchido = 100% descontado só deste sócio. */
+  socioId?: string | null;
 }
 
 export interface ClienteCalcInput {
@@ -37,6 +42,7 @@ export interface LinhaCalculada {
   notaFiscalId: string;
   tomador: string;
   numero: string;
+  tipoTomador?: TipoTomador | null;
   vb: number;
   issRet: number;
   issRetPct: number;
@@ -96,6 +102,7 @@ function calcularLinhaPresumido(nf: NotaFiscalCalcInput, custoFixoAplicado: numb
     notaFiscalId: nf.id,
     tomador: nf.tomador,
     numero: nf.numero,
+    tipoTomador: nf.tipoTomador,
     vb: round2(vb),
     issRet: round2(issRet),
     issRetPct: 0,
@@ -138,6 +145,7 @@ function calcularLinhaSimples(
     notaFiscalId: nf.id,
     tomador: nf.tomador,
     numero: nf.numero,
+    tipoTomador: nf.tipoTomador,
     vb: round2(vb),
     issRet: round2(issRet),
     issRetPct: issRetPct.toNumber(),
@@ -194,6 +202,46 @@ export function calcularDemonstrativo(
   };
 }
 
+/**
+ * Agrupa todas as linhas de Pessoa Física (paciente) numa única linha "Pessoa
+ * Física", somando os valores — evita listar cada paciente individualmente no
+ * demonstrativo do médico. Notas de Pessoa Jurídica continuam individuais.
+ */
+export function agruparPessoasFisicas(resultado: ResultadoCalculo): ResultadoCalculo {
+  const linhasPF = resultado.linhas.filter((l) => l.tipoTomador === "PF");
+  const linhasOutras = resultado.linhas.filter((l) => l.tipoTomador !== "PF");
+
+  if (linhasPF.length === 0) return resultado;
+
+  const somaCampo = (key: keyof LinhaCalculada): number =>
+    round2(linhasPF.reduce((s, l) => s.plus(d(l[key] as number)), new Decimal(0)));
+
+  const linhaAgrupada: LinhaCalculada = {
+    notaFiscalId: linhasPF.map((l) => l.notaFiscalId).join(","),
+    tomador: "Pessoa Física",
+    numero: `${linhasPF.length} nota(s)`,
+    tipoTomador: "PF",
+    vb: somaCampo("vb"),
+    issRet: somaCampo("issRet"),
+    issRetPct: 0,
+    pis: somaCampo("pis"),
+    cofins: somaCampo("cofins"),
+    csllRet: somaCampo("csllRet"),
+    irRet: somaCampo("irRet"),
+    irRetPct: 0,
+    totalRetencoes: somaCampo("totalRetencoes"),
+    provIrpj: somaCampo("provIrpj"),
+    provCsll: somaCampo("provCsll"),
+    provDas: somaCampo("provDas"),
+    totalProvisoes: somaCampo("totalProvisoes"),
+    custoFixoAplicado: somaCampo("custoFixoAplicado"),
+    valorLiquido: somaCampo("valorLiquido"),
+    valorLiquidoNf: somaCampo("valorLiquidoNf"),
+  };
+
+  return { ...resultado, linhas: [...linhasOutras, linhaAgrupada] };
+}
+
 export interface SocioGroup {
   socioId: string;
   socioNome: string;
@@ -208,10 +256,12 @@ export interface ResultadoPorSocio {
 }
 
 /**
- * Calcula um demonstrativo separado para cada sócio, dividindo cada custo fixo
- * igualmente entre TODOS os sócios ativos do cliente (não só os que têm nota
- * incluída neste lote) — quem não tem nota este mês simplesmente não gera
- * demonstrativo, mas ainda entra na divisão do custo fixo dos demais.
+ * Calcula um demonstrativo separado para cada sócio. Custos fixos sem sócio
+ * (socioId null/ausente) são divididos igualmente entre TODOS os sócios
+ * ativos do cliente (mesmo os sem nota neste lote); custos com um socioId
+ * específico são descontados 100% só do demonstrativo daquele sócio, sem
+ * entrar na divisão dos demais. Notas de Pessoa Física são agrupadas numa
+ * única linha por sócio.
  */
 export function calcularDemonstrativosPorSocio(
   cliente: ClienteCalcInput,
@@ -220,17 +270,20 @@ export function calcularDemonstrativosPorSocio(
   numSociosAtivos: number
 ): ResultadoPorSocio[] {
   const divisor = numSociosAtivos > 0 ? numSociosAtivos : 1;
-  const custosDivididos = custosFixos.map((cf) => ({
-    ...cf,
-    valor: round2(d(cf.valor).div(divisor)),
-  }));
+  const custosDivididos = custosFixos
+    .filter((cf) => !cf.socioId)
+    .map((cf) => ({ ...cf, valor: round2(d(cf.valor).div(divisor)) }));
+  const custosEspecificos = custosFixos.filter((cf) => !!cf.socioId);
 
   return grupos
     .filter((grupo) => grupo.notas.length > 0)
-    .map((grupo) => ({
-      socioId: grupo.socioId,
-      socioNome: grupo.socioNome,
-      custosUsados: custosDivididos,
-      resultado: calcularDemonstrativo(cliente, grupo.notas, custosDivididos),
-    }));
+    .map((grupo) => {
+      const custosDoSocio = [...custosDivididos, ...custosEspecificos.filter((cf) => cf.socioId === grupo.socioId)];
+      return {
+        socioId: grupo.socioId,
+        socioNome: grupo.socioNome,
+        custosUsados: custosDoSocio,
+        resultado: agruparPessoasFisicas(calcularDemonstrativo(cliente, grupo.notas, custosDoSocio)),
+      };
+    });
 }

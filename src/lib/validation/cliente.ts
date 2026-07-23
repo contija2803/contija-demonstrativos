@@ -3,6 +3,8 @@ import { z } from "zod";
 export const custoFixoInputSchema = z.object({
   desc: z.string().trim().min(1, "Descrição é obrigatória"),
   valor: z.coerce.number().min(0, "Valor não pode ser negativo"),
+  // null/ausente = dividido entre todos os sócios; preenchido = só deste sócio.
+  socioId: z.string().trim().min(1).nullable().optional(),
 });
 
 export const socioInputSchema = z.object({

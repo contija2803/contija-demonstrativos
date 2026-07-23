@@ -5,6 +5,7 @@ export interface CustoFixoJSON {
   desc: string;
   valor: number;
   ativo: boolean;
+  socioId: string | null;
 }
 
 export interface SocioJSON {
@@ -36,6 +37,7 @@ export function serializeCliente(
       desc: cf.desc,
       valor: Number(cf.valor),
       ativo: cf.ativo,
+      socioId: cf.socioId,
     })),
     socios: cliente.socios.map((s) => ({ id: s.id, nome: s.nome, ativo: s.ativo })),
   };
@@ -56,6 +58,7 @@ export interface NotaFiscalJSON {
   status: "PENDENTE" | "INCLUIDA";
   socioId: string | null;
   descricao: string | null;
+  tipoTomador: "PF" | "PJ" | null;
 }
 
 export function serializeNotaFiscal(nota: NotaFiscal): NotaFiscalJSON {
@@ -74,5 +77,6 @@ export function serializeNotaFiscal(nota: NotaFiscal): NotaFiscalJSON {
     status: nota.status,
     socioId: nota.socioId,
     descricao: nota.descricao,
+    tipoTomador: nota.tipoTomador,
   };
 }

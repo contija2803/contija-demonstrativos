@@ -159,6 +159,24 @@ describe("parseNfeCsv", () => {
     expect(nota.prestador).toBe("Clinica Ficticia LTDA");
     expect(nota.descricao).toBe("Nota ref. a Consulta com Dr. Fulano de Tal CRM 12345.");
   });
+
+  it("identifica tipoTomador PF quando o indicador é 1", () => {
+    const csv = [HEADER, buildRow({ indicadorTomador: "1" })].join("\n");
+    const [nota] = parseNfeCsv(csv);
+    expect(nota.tipoTomador).toBe("PF");
+  });
+
+  it("identifica tipoTomador PJ quando o indicador é 2", () => {
+    const csv = [HEADER, buildRow({ indicadorTomador: "2" })].join("\n");
+    const [nota] = parseNfeCsv(csv);
+    expect(nota.tipoTomador).toBe("PJ");
+  });
+
+  it("tipoTomador fica indefinido para indicador desconhecido", () => {
+    const csv = [HEADER, buildRow({ indicadorTomador: "" })].join("\n");
+    const [nota] = parseNfeCsv(csv);
+    expect(nota.tipoTomador).toBeUndefined();
+  });
 });
 
 describe("matchSocio", () => {

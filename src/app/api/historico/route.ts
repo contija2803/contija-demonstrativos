@@ -3,7 +3,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { salvarHistoricoSchema } from "@/lib/validation/historico";
-import { calcularDemonstrativo, type ClienteCalcInput, type NotaFiscalCalcInput } from "@/lib/calculo/tributos";
+import {
+  calcularDemonstrativo,
+  agruparPessoasFisicas,
+  type ClienteCalcInput,
+  type NotaFiscalCalcInput,
+} from "@/lib/calculo/tributos";
 import type { DemonstrativoView } from "@/components/DemonstrativoDocument";
 
 export async function GET() {
@@ -70,10 +75,11 @@ export async function POST(req: NextRequest) {
     valorBruto: Number(n.valorBruto),
     irRetPct: n.irRetPct !== null ? Number(n.irRetPct) : null,
     issRetPct: n.issRetPct !== null ? Number(n.issRetPct) : null,
+    tipoTomador: n.tipoTomador,
   }));
   const custosFixosCalc = custosUsados.map((cf, i) => ({ id: String(i), desc: cf.desc, valor: cf.valor }));
 
-  const resultado = calcularDemonstrativo(clienteCalc, notasCalc, custosFixosCalc);
+  const resultado = agruparPessoasFisicas(calcularDemonstrativo(clienteCalc, notasCalc, custosFixosCalc));
 
   const resultadoJson: DemonstrativoView = {
     cliente: {

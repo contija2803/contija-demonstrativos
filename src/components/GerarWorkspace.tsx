@@ -20,6 +20,7 @@ interface CustoSessao {
   desc: string;
   valor: number;
   incluido: boolean;
+  socioId: string | null;
 }
 
 interface Props {
@@ -33,7 +34,7 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
 
   const [notas, setNotas] = useState<NotaFiscalJSON[]>(initialNotas);
   const [custosSessao, setCustosSessao] = useState<CustoSessao[]>(
-    cliente.custosFixos.map((cf) => ({ id: cf.id, desc: cf.desc, valor: cf.valor, incluido: true }))
+    cliente.custosFixos.map((cf) => ({ id: cf.id, desc: cf.desc, valor: cf.valor, incluido: true, socioId: cf.socioId }))
   );
   const [aliquotaInline, setAliquotaInline] = useState(cliente.aliquotaSimplesMensal?.toString() ?? "");
   const [resultados, setResultados] = useState<ResultadoPorSocio[] | null>(null);
@@ -99,11 +100,13 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
   }
 
   function addCustoSessaoExtra() {
-    setCustosSessao((prev) => [...prev, { id: uid(), desc: "", valor: 0, incluido: true }]);
+    setCustosSessao((prev) => [...prev, { id: uid(), desc: "", valor: 0, incluido: true, socioId: null }]);
   }
 
-  function updateCustoSessao(id: string, field: keyof CustoSessao, value: string | number | boolean) {
-    setCustosSessao((prev) => prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
+  function updateCustoSessao(id: string, field: keyof CustoSessao, value: string | number | boolean | null) {
+    setCustosSessao((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, [field]: field === "socioId" ? value || null : value } : c))
+    );
     setResultados(null);
   }
 
@@ -127,7 +130,7 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
         empresa: cliente.empresa,
         regime: cliente.regime,
         aliquotaSimplesMensal: valor,
-        custosFixos: cliente.custosFixos.map((cf) => ({ desc: cf.desc, valor: cf.valor })),
+        custosFixos: cliente.custosFixos.map((cf) => ({ desc: cf.desc, valor: cf.valor, socioId: cf.socioId })),
         socios: cliente.socios.map((s) => ({ id: s.id, nome: s.nome })),
       }),
     });
@@ -150,7 +153,7 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
 
     const custosAtivos = custosSessao
       .filter((c) => c.incluido)
-      .map((c, i) => ({ id: String(i), desc: c.desc, valor: c.valor }));
+      .map((c, i) => ({ id: String(i), desc: c.desc, valor: c.valor, socioId: c.socioId }));
 
     const grupos = cliente.socios.map((s) => ({
       socioId: s.id,
@@ -164,6 +167,7 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
           valorBruto: n.valorBruto,
           irRetPct: n.irRetPct,
           issRetPct: n.issRetPct,
+          tipoTomador: n.tipoTomador,
         })),
     }));
 
@@ -248,7 +252,7 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
           Sócios: {cliente.socios.map((s) => s.nome).join(", ") || "—"}
           <br />
           Custo fixo mensal cadastrado: {brl(cliente.custosFixos.reduce((s, cf) => s + cf.valor, 0))}
-          {multiSocio && ` (dividido igualmente entre os ${cliente.socios.length} sócios)`}
+          {multiSocio && " (veja a divisão por sócio na seção 3, abaixo)"}
           {isSimples && (
             <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
               <label style={{ fontSize: 11, fontWeight: 700, color: "var(--navy-dark)" }}>
@@ -293,7 +297,7 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
           <div className="hint" style={{ marginBottom: 10 }}>
             Marque só o que deve ser descontado neste demonstrativo. Dá para editar valores, desmarcar itens ou
             lançar um custo extra que não fica salvo no cadastro do cliente.
-            {multiSocio && " O valor é dividido igualmente entre todos os sócios cadastrados."}
+            {multiSocio && " Cada custo pode ser dividido entre todos os sócios, ou só de um sócio específico."}
           </div>
           {custosSessao.length === 0 ? (
             <div className="empty">Nenhum custo fixo cadastrado para este cliente. Adicione um extra se precisar.</div>
@@ -320,6 +324,20 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
                   value={c.valor}
                   onChange={(e) => updateCustoSessao(c.id, "valor", parseFloat(e.target.value) || 0)}
                 />
+                {multiSocio && (
+                  <select
+                    style={{ width: 200 }}
+                    value={c.socioId ?? ""}
+                    onChange={(e) => updateCustoSessao(c.id, "socioId", e.target.value)}
+                  >
+                    <option value="">Dividido entre todos os sócios</option>
+                    {cliente.socios.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        Só de: {s.nome}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <button className="btn danger" onClick={() => removeCustoSessao(c.id)}>
                   Remover
                 </button>
@@ -331,7 +349,22 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
           </button>
           <div className="note" style={{ marginTop: 12 }}>
             Total a descontar neste demonstrativo: <b>{brl(totalCustosSessao)}</b>
-            {multiSocio && ` (${brl(totalCustosSessao / cliente.socios.length)} por sócio)`}
+            {multiSocio && (
+              <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                {cliente.socios.map((s) => {
+                  const divididos = custosSessao.filter((c) => c.incluido && !c.socioId).reduce((sum, c) => sum + c.valor, 0);
+                  const especificos = custosSessao
+                    .filter((c) => c.incluido && c.socioId === s.id)
+                    .reduce((sum, c) => sum + c.valor, 0);
+                  const totalSocio = divididos / cliente.socios.length + especificos;
+                  return (
+                    <li key={s.id}>
+                      {s.nome}: {brl(totalSocio)}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         </div>
       )}

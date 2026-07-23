@@ -29,6 +29,11 @@ enum UserRole {
   CLIENTE
 }
 
+enum TipoTomador {
+  PF
+  PJ
+}
+
 model User {
   id           String      @id @default(cuid())
   name         String
@@ -68,6 +73,7 @@ model Socio {
 
   notasFiscais NotaFiscal[]
   historicos   Historico[]
+  custosFixos  CustoFixo[]
 }
 
 model CustoFixo {
@@ -77,6 +83,10 @@ model CustoFixo {
   desc      String
   valor     Decimal @db.Decimal(12, 2)
   ativo     Boolean @default(true)
+
+  // null = dividido igualmente entre todos os sócios ativos; preenchido = descontado só deste sócio.
+  socioId String?
+  socio   Socio?  @relation(fields: [socioId], references: [id], onDelete: SetNull)
 }
 
 model NotaFiscal {
@@ -99,6 +109,7 @@ model NotaFiscal {
   historicoId String?
   historico   Historico? @relation(fields: [historicoId], references: [id])
   descricao   String?
+  tipoTomador TipoTomador?
   createdAt   DateTime   @default(now())
 
   @@index([clienteId, status])
