@@ -12,6 +12,7 @@ export function NavTabs({ role }: { role: "ADMIN" | "STAFF" | "CLIENTE" }) {
       : [
           { href: "/gerar", label: "Gerar Demonstrativo" },
           { href: "/clientes", label: "Clientes" },
+          { href: "/pendentes", label: "Notas Pendentes" },
           { href: "/historico", label: "Histórico" },
           ...(role === "ADMIN" ? [{ href: "/usuarios", label: "Usuários" }] : []),
         ];
