@@ -46,16 +46,28 @@ model User {
 model Cliente {
   id                    String   @id @default(cuid())
   empresa               String
-  profissional          String
   regime                Regime
   aliquotaSimplesMensal Decimal? @db.Decimal(6, 4)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
+  socios           Socio[]
   custosFixos      CustoFixo[]
   notasFiscais     NotaFiscal[]
   historicos       Historico[]
   usuariosClientes User[]
+}
+
+model Socio {
+  id        String   @id @default(cuid())
+  clienteId String
+  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  nome      String
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  notasFiscais NotaFiscal[]
+  historicos   Historico[]
 }
 
 model CustoFixo {
@@ -71,6 +83,8 @@ model NotaFiscal {
   id          String     @id @default(cuid())
   clienteId   String
   cliente     Cliente    @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  socioId     String?
+  socio       Socio?     @relation(fields: [socioId], references: [id], onDelete: SetNull)
   tomador     String
   prestador   String
   numero      String
@@ -84,6 +98,7 @@ model NotaFiscal {
   status      StatusNf   @default(PENDENTE)
   historicoId String?
   historico   Historico? @relation(fields: [historicoId], references: [id])
+  descricao   String?
   createdAt   DateTime   @default(now())
 
   @@index([clienteId, status])
@@ -93,6 +108,8 @@ model Historico {
   id               String       @id @default(cuid())
   clienteId        String
   cliente          Cliente      @relation(fields: [clienteId], references: [id])
+  socioId          String?
+  socio            Socio?       @relation(fields: [socioId], references: [id], onDelete: SetNull)
   clienteNomeSnap  String
   profissionalSnap String
   regimeSnap       Regime

@@ -13,7 +13,7 @@ export default async function GerarClientePage({ params }: { params: Promise<{ c
 
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },
-    include: { custosFixos: true },
+    include: { custosFixos: true, socios: { where: { ativo: true }, orderBy: { createdAt: "asc" } } },
   });
   if (!cliente) notFound();
 
@@ -23,7 +23,7 @@ export default async function GerarClientePage({ params }: { params: Promise<{ c
   });
 
   const clientesLista = await prisma.cliente.findMany({
-    select: { id: true, empresa: true, profissional: true },
+    select: { id: true, empresa: true },
     orderBy: { empresa: "asc" },
   });
 

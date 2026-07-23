@@ -63,7 +63,7 @@ export function ClientesManager({ initialClientes }: { initialClientes: ClienteJ
                       </span>
                     </b>
                     <span style={{ fontSize: 11.5, color: "var(--gray)" }}>
-                      {c.profissional || "—"} · Custo fixo mensal: {brl(totalCustos)}
+                      {c.socios.map((s) => s.nome).join(", ") || "—"} · Custo fixo mensal: {brl(totalCustos)}
                     </span>
                   </div>
                   <div>

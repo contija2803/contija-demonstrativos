@@ -10,7 +10,7 @@ export default async function ClientesPage() {
   if (session?.user?.role === "CLIENTE") redirect("/historico");
 
   const clientes = await prisma.cliente.findMany({
-    include: { custosFixos: true },
+    include: { custosFixos: true, socios: { where: { ativo: true }, orderBy: { createdAt: "asc" } } },
     orderBy: { empresa: "asc" },
   });
 

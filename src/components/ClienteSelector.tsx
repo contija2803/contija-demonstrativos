@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 
 interface Props {
-  clientes: { id: string; empresa: string; profissional: string }[];
+  clientes: { id: string; empresa: string }[];
 }
 
 export function ClienteSelector({ clientes }: Props) {
@@ -23,7 +23,6 @@ export function ClienteSelector({ clientes }: Props) {
           {clientes.map((c) => (
             <option key={c.id} value={c.id}>
               {c.empresa}
-              {c.profissional ? ` — ${c.profissional}` : ""}
             </option>
           ))}
         </select>

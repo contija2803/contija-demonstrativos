@@ -9,7 +9,7 @@ export default async function GerarPage() {
   if (session?.user?.role === "CLIENTE") redirect("/historico");
 
   const clientes = await prisma.cliente.findMany({
-    select: { id: true, empresa: true, profissional: true },
+    select: { id: true, empresa: true },
     orderBy: { empresa: "asc" },
   });
 

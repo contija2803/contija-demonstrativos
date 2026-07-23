@@ -193,3 +193,44 @@ export function calcularDemonstrativo(
     valorATransferir: sumField("valorLiquido"),
   };
 }
+
+export interface SocioGroup {
+  socioId: string;
+  socioNome: string;
+  notas: NotaFiscalCalcInput[];
+}
+
+export interface ResultadoPorSocio {
+  socioId: string;
+  socioNome: string;
+  custosUsados: CustoFixoCalcInput[];
+  resultado: ResultadoCalculo;
+}
+
+/**
+ * Calcula um demonstrativo separado para cada sócio, dividindo cada custo fixo
+ * igualmente entre TODOS os sócios ativos do cliente (não só os que têm nota
+ * incluída neste lote) — quem não tem nota este mês simplesmente não gera
+ * demonstrativo, mas ainda entra na divisão do custo fixo dos demais.
+ */
+export function calcularDemonstrativosPorSocio(
+  cliente: ClienteCalcInput,
+  grupos: SocioGroup[],
+  custosFixos: CustoFixoCalcInput[],
+  numSociosAtivos: number
+): ResultadoPorSocio[] {
+  const divisor = numSociosAtivos > 0 ? numSociosAtivos : 1;
+  const custosDivididos = custosFixos.map((cf) => ({
+    ...cf,
+    valor: round2(d(cf.valor).div(divisor)),
+  }));
+
+  return grupos
+    .filter((grupo) => grupo.notas.length > 0)
+    .map((grupo) => ({
+      socioId: grupo.socioId,
+      socioNome: grupo.socioNome,
+      custosUsados: custosDivididos,
+      resultado: calcularDemonstrativo(cliente, grupo.notas, custosDivididos),
+    }));
+}

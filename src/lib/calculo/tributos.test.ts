@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcularDemonstrativo } from "./tributos";
+import { calcularDemonstrativo, calcularDemonstrativosPorSocio } from "./tributos";
 
 describe("calcularDemonstrativo", () => {
   it("Lucro Presumido — uma nota, sem custos fixos", () => {
@@ -89,5 +89,60 @@ describe("calcularDemonstrativo", () => {
       []
     );
     expect(simples.linhas[0].provDas).toBe(0);
+  });
+});
+
+describe("calcularDemonstrativosPorSocio", () => {
+  it("divide cada custo fixo igualmente entre todos os sócios ativos, mesmo os sem nota este mês", () => {
+    const grupos = [
+      {
+        socioId: "s1",
+        socioNome: "Dr. A",
+        notas: [{ id: "nf1", tomador: "X", numero: "1", valorBruto: 1000, irRetPct: 1.5 }],
+      },
+      {
+        socioId: "s2",
+        socioNome: "Dr. B",
+        notas: [{ id: "nf2", tomador: "Y", numero: "2", valorBruto: 2000, irRetPct: 1.5 }],
+      },
+    ];
+    // 3 sócios ativos no total (um deles sem nota incluída este mês)
+    const resultados = calcularDemonstrativosPorSocio(
+      { regime: "PRESUMIDO" },
+      grupos,
+      [{ id: "cf1", desc: "Honorário contábil", valor: 900 }],
+      3
+    );
+
+    expect(resultados).toHaveLength(2);
+    // 900 / 3 sócios = 300 para cada um
+    expect(resultados[0].custosUsados[0].valor).toBeCloseTo(300, 2);
+    expect(resultados[1].custosUsados[0].valor).toBeCloseTo(300, 2);
+    expect(resultados[0].resultado.totalCustoFixo).toBeCloseTo(300, 2);
+    expect(resultados[0].resultado.linhas[0].custoFixoAplicado).toBeCloseTo(300, 2);
+    expect(resultados[1].resultado.linhas[0].custoFixoAplicado).toBeCloseTo(300, 2);
+  });
+
+  it("não gera demonstrativo para sócio sem nenhuma nota incluída", () => {
+    const grupos = [
+      { socioId: "s1", socioNome: "Dr. A", notas: [{ id: "nf1", tomador: "X", numero: "1", valorBruto: 1000, irRetPct: 1.5 }] },
+      { socioId: "s2", socioNome: "Dr. B", notas: [] },
+    ];
+    const resultados = calcularDemonstrativosPorSocio({ regime: "PRESUMIDO" }, grupos, [], 2);
+    expect(resultados).toHaveLength(1);
+    expect(resultados[0].socioId).toBe("s1");
+  });
+
+  it("com um único sócio, o resultado é idêntico a calcularDemonstrativo direto (divisor 1)", () => {
+    const notas = [{ id: "nf1", tomador: "X", numero: "1", valorBruto: 1000, irRetPct: 1.5 }];
+    const custos = [{ id: "cf1", desc: "Honorário", valor: 500 }];
+    const direto = calcularDemonstrativo({ regime: "PRESUMIDO" }, notas, custos);
+    const [porSocio] = calcularDemonstrativosPorSocio(
+      { regime: "PRESUMIDO" },
+      [{ socioId: "s1", socioNome: "Dr. A", notas }],
+      custos,
+      1
+    );
+    expect(porSocio.resultado.valorATransferir).toBeCloseTo(direto.valorATransferir, 2);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decodeCsvBuffer, parseMoney, parseNfeCsv } from "./parserNfseCsv";
+import { decodeCsvBuffer, parseMoney, parseNfeCsv, matchSocio } from "./parserNfseCsv";
 
 // Layout de 53 colunas confirmado num export real da prefeitura, mas todos os
 // valores aqui são fictícios — nenhum dado real de paciente/cliente é usado.
@@ -147,12 +147,40 @@ describe("parseNfeCsv", () => {
     expect(notas.map((n) => n.numero)).toEqual(["100", "101"]);
   });
 
-  it("extrai número, data, tomador e prestador corretamente", () => {
-    const csv = [HEADER, buildRow()].join("\n");
+  it("extrai número, data, tomador, prestador e descrição corretamente", () => {
+    const csv = [
+      HEADER,
+      buildRow({ discriminacao: "Nota ref. a Consulta com Dr. Fulano de Tal CRM 12345." }),
+    ].join("\n");
     const [nota] = parseNfeCsv(csv);
     expect(nota.numero).toBe("100");
     expect(nota.data).toBe("15/03/2026");
     expect(nota.tomador).toBe("Fulano de Tal Ficticio");
     expect(nota.prestador).toBe("Clinica Ficticia LTDA");
+    expect(nota.descricao).toBe("Nota ref. a Consulta com Dr. Fulano de Tal CRM 12345.");
+  });
+});
+
+describe("matchSocio", () => {
+  const socios = [
+    { id: "s1", nome: "Fulano de Tal" },
+    { id: "s2", nome: "Beltrana da Silva" },
+  ];
+
+  it("encontra o sócio cujo nome aparece na descrição", () => {
+    expect(matchSocio("Nota ref. a Consulta com Dr. Fulano de Tal CRM 12345.", socios)).toBe("s1");
+    expect(matchSocio("Consulta realizada pela Dra. Beltrana da Silva.", socios)).toBe("s2");
+  });
+
+  it("ignora acentuação e caixa ao comparar", () => {
+    expect(matchSocio("consulta com dr. FULANO DE TAL crm 1", socios)).toBe("s1");
+  });
+
+  it("retorna null quando nenhum sócio bate", () => {
+    expect(matchSocio("Consulta com Dr. Ninguem Registrado", socios)).toBeNull();
+  });
+
+  it("retorna null para descrição vazia", () => {
+    expect(matchSocio("", socios)).toBeNull();
   });
 });

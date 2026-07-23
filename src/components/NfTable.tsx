@@ -5,12 +5,15 @@ import type { NotaFiscalJSON } from "@/lib/serialize";
 interface Props {
   notas: NotaFiscalJSON[];
   isSimples: boolean;
-  onUpdate: (id: string, field: string, value: string | number | boolean) => void;
+  socios: { id: string; nome: string }[];
+  onUpdate: (id: string, field: string, value: string | number | boolean | null) => void;
   onRemove: (id: string) => void;
 }
 
-export function NfTable({ notas, isSimples, onUpdate, onRemove }: Props) {
+export function NfTable({ notas, isSimples, socios, onUpdate, onRemove }: Props) {
   if (!notas.length) return null;
+
+  const mostrarSocio = socios.length > 1;
 
   return (
     <div style={{ marginTop: 14 }}>
@@ -19,6 +22,7 @@ export function NfTable({ notas, isSimples, onUpdate, onRemove }: Props) {
           <tr>
             <th>Incluir</th>
             <th>Unidade/Tomador</th>
+            {mostrarSocio && <th>Sócio</th>}
             <th>Nº NF</th>
             <th>Data</th>
             <th>Valor bruto</th>
@@ -51,7 +55,28 @@ export function NfTable({ notas, isSimples, onUpdate, onRemove }: Props) {
                     ⚠ possível NF cancelada — confira antes de incluir
                   </div>
                 )}
+                {mostrarSocio && !n.socioId && (
+                  <div className="hint" style={{ color: "#8a3a12" }}>
+                    ⚠ sócio não identificado
+                  </div>
+                )}
               </td>
+              {mostrarSocio && (
+                <td>
+                  <select
+                    style={{ width: 140 }}
+                    value={n.socioId ?? ""}
+                    onChange={(e) => onUpdate(n.id, "socioId", e.target.value || null)}
+                  >
+                    <option value="">— selecionar —</option>
+                    {socios.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.nome}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+              )}
               <td>
                 <input
                   style={{ width: 70 }}

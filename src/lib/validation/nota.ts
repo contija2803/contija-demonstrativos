@@ -11,6 +11,7 @@ export const notaFiscalDraftSchema = z.object({
   incluido: z.boolean().default(true),
   origem: z.enum(["NOVO", "PENDENTE_ANTERIOR"]).default("NOVO"),
   cancelada: z.boolean().default(false),
+  descricao: z.string().optional(),
 });
 
 export const notasFiscaisBatchSchema = z.object({
@@ -26,4 +27,5 @@ export const notaFiscalPatchSchema = z.object({
   irRetPct: z.coerce.number().min(0).max(100).nullable().optional(),
   issRetPct: z.coerce.number().min(0).max(100).nullable().optional(),
   incluido: z.boolean().optional(),
+  socioId: z.string().nullable().optional(),
 });

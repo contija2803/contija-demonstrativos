@@ -41,19 +41,22 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { clienteId, notaIds, custosUsados } = parsed.data;
+  const { clienteId, socioId, notaIds, custosUsados } = parsed.data;
 
   const cliente = await prisma.cliente.findUnique({ where: { id: clienteId } });
   if (!cliente) return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
 
+  const socio = await prisma.socio.findFirst({ where: { id: socioId, clienteId } });
+  if (!socio) return NextResponse.json({ error: "Sócio não encontrado para este cliente." }, { status: 404 });
+
   const notasRows = await prisma.notaFiscal.findMany({
-    where: { id: { in: notaIds }, clienteId, status: "PENDENTE" },
+    where: { id: { in: notaIds }, clienteId, socioId, status: "PENDENTE" },
   });
   const notasById = new Map(notasRows.map((n) => [n.id, n]));
   const notasOrdenadas = notaIds.map((id) => notasById.get(id)).filter((n): n is NonNullable<typeof n> => !!n);
 
   if (!notasOrdenadas.length) {
-    return NextResponse.json({ error: "Nenhuma nota fiscal pendente válida foi encontrada." }, { status: 400 });
+    return NextResponse.json({ error: "Nenhuma nota fiscal pendente válida foi encontrada para este sócio." }, { status: 400 });
   }
 
   const clienteCalc: ClienteCalcInput = {
@@ -75,7 +78,7 @@ export async function POST(req: NextRequest) {
   const resultadoJson: DemonstrativoView = {
     cliente: {
       empresa: cliente.empresa,
-      profissional: cliente.profissional,
+      profissional: socio.nome,
       regime: cliente.regime,
       aliquotaSimplesMensal: clienteCalc.aliquotaSimplesMensal ?? null,
     },
@@ -87,8 +90,9 @@ export async function POST(req: NextRequest) {
     const created = await tx.historico.create({
       data: {
         clienteId: cliente.id,
+        socioId: socio.id,
         clienteNomeSnap: cliente.empresa,
-        profissionalSnap: cliente.profissional,
+        profissionalSnap: socio.nome,
         regimeSnap: cliente.regime,
         resultadoJson: JSON.parse(JSON.stringify(resultadoJson)),
         createdByUserId: session?.user?.id ?? null,

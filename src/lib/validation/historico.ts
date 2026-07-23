@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const salvarHistoricoSchema = z.object({
   clienteId: z.string().min(1),
+  socioId: z.string().min(1),
   notaIds: z.array(z.string().min(1)).min(1),
   custosUsados: z
     .array(

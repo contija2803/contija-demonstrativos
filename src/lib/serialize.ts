@@ -1,4 +1,4 @@
-import type { Cliente, CustoFixo, NotaFiscal } from "@prisma/client";
+import type { Cliente, CustoFixo, NotaFiscal, Socio } from "@prisma/client";
 
 export interface CustoFixoJSON {
   id: string;
@@ -7,21 +7,28 @@ export interface CustoFixoJSON {
   ativo: boolean;
 }
 
+export interface SocioJSON {
+  id: string;
+  nome: string;
+  ativo: boolean;
+}
+
 export interface ClienteJSON {
   id: string;
   empresa: string;
-  profissional: string;
   regime: "PRESUMIDO" | "SIMPLES";
   aliquotaSimplesMensal: number | null;
   custosFixos: CustoFixoJSON[];
+  socios: SocioJSON[];
 }
 
 /** Converte campos Decimal do Prisma para number puro, para o frontend consumir sem surpresas. */
-export function serializeCliente(cliente: Cliente & { custosFixos: CustoFixo[] }): ClienteJSON {
+export function serializeCliente(
+  cliente: Cliente & { custosFixos: CustoFixo[]; socios: Socio[] }
+): ClienteJSON {
   return {
     id: cliente.id,
     empresa: cliente.empresa,
-    profissional: cliente.profissional,
     regime: cliente.regime,
     aliquotaSimplesMensal: cliente.aliquotaSimplesMensal ? Number(cliente.aliquotaSimplesMensal) : null,
     custosFixos: cliente.custosFixos.map((cf) => ({
@@ -30,6 +37,7 @@ export function serializeCliente(cliente: Cliente & { custosFixos: CustoFixo[] }
       valor: Number(cf.valor),
       ativo: cf.ativo,
     })),
+    socios: cliente.socios.map((s) => ({ id: s.id, nome: s.nome, ativo: s.ativo })),
   };
 }
 
@@ -46,6 +54,8 @@ export interface NotaFiscalJSON {
   origem: "NOVO" | "PENDENTE_ANTERIOR";
   cancelada: boolean;
   status: "PENDENTE" | "INCLUIDA";
+  socioId: string | null;
+  descricao: string | null;
 }
 
 export function serializeNotaFiscal(nota: NotaFiscal): NotaFiscalJSON {
@@ -62,5 +72,7 @@ export function serializeNotaFiscal(nota: NotaFiscal): NotaFiscalJSON {
     origem: nota.origem,
     cancelada: nota.cancelada,
     status: nota.status,
+    socioId: nota.socioId,
+    descricao: nota.descricao,
   };
 }

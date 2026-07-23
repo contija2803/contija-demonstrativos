@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ClienteJSON, NotaFiscalJSON } from "@/lib/serialize";
-import { calcularDemonstrativo, type ResultadoCalculo } from "@/lib/calculo/tributos";
+import { calcularDemonstrativosPorSocio, type ResultadoPorSocio } from "@/lib/calculo/tributos";
 import { brl } from "@/lib/format";
 import { NfUploadDropzone } from "./NfUploadDropzone";
 import { NfTable } from "./NfTable";
@@ -25,7 +25,7 @@ interface CustoSessao {
 interface Props {
   cliente: ClienteJSON;
   initialNotas: NotaFiscalJSON[];
-  clientesLista: { id: string; empresa: string; profissional: string }[];
+  clientesLista: { id: string; empresa: string }[];
 }
 
 export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) {
@@ -36,21 +36,21 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
     cliente.custosFixos.map((cf) => ({ id: cf.id, desc: cf.desc, valor: cf.valor, incluido: true }))
   );
   const [aliquotaInline, setAliquotaInline] = useState(cliente.aliquotaSimplesMensal?.toString() ?? "");
-  const [resultado, setResultado] = useState<ResultadoCalculo | null>(null);
-  const [custosUsadosSnapshot, setCustosUsadosSnapshot] = useState<{ desc: string; valor: number }[]>([]);
+  const [resultados, setResultados] = useState<ResultadoPorSocio[] | null>(null);
   const [toast, setToast] = useState("");
   const [saving, setSaving] = useState(false);
 
   const isSimples = cliente.regime === "SIMPLES";
+  const multiSocio = cliente.socios.length > 1;
 
   function showToast(msg: string) {
     setToast(msg);
-    setTimeout(() => setToast(""), 2600);
+    setTimeout(() => setToast(""), 3200);
   }
 
-  async function handleUpdateNf(id: string, field: string, value: string | number | boolean) {
+  async function handleUpdateNf(id: string, field: string, value: string | number | boolean | null) {
     setNotas((prev) => prev.map((n) => (n.id === id ? { ...n, [field]: value } : n)));
-    setResultado(null);
+    setResultados(null);
     try {
       await fetch(`/api/notas/${id}`, {
         method: "PATCH",
@@ -64,7 +64,7 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
 
   async function handleRemoveNf(id: string) {
     setNotas((prev) => prev.filter((n) => n.id !== id));
-    setResultado(null);
+    setResultados(null);
     await fetch(`/api/notas/${id}`, { method: "DELETE" });
   }
 
@@ -104,12 +104,12 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
 
   function updateCustoSessao(id: string, field: keyof CustoSessao, value: string | number | boolean) {
     setCustosSessao((prev) => prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
-    setResultado(null);
+    setResultados(null);
   }
 
   function removeCustoSessao(id: string) {
     setCustosSessao((prev) => prev.filter((c) => c.id !== id));
-    setResultado(null);
+    setResultados(null);
   }
 
   const totalCustosSessao = custosSessao.filter((c) => c.incluido).reduce((s, c) => s + (c.valor || 0), 0);
@@ -125,10 +125,10 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         empresa: cliente.empresa,
-        profissional: cliente.profissional,
         regime: cliente.regime,
         aliquotaSimplesMensal: valor,
         custosFixos: cliente.custosFixos.map((cf) => ({ desc: cf.desc, valor: cf.valor })),
+        socios: cliente.socios.map((s) => ({ id: s.id, nome: s.nome })),
       }),
     });
     if (res.ok) {
@@ -145,63 +145,77 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
       showToast('Marque "Incluir" em ao menos uma NF para gerar o demonstrativo.');
       return;
     }
-    const custosAtivos = custosSessao.filter((c) => c.incluido).map((c) => ({ desc: c.desc, valor: c.valor }));
 
-    const r = calcularDemonstrativo(
+    const semSocio = selecionadas.filter((n) => !n.socioId).length;
+
+    const custosAtivos = custosSessao
+      .filter((c) => c.incluido)
+      .map((c, i) => ({ id: String(i), desc: c.desc, valor: c.valor }));
+
+    const grupos = cliente.socios.map((s) => ({
+      socioId: s.id,
+      socioNome: s.nome,
+      notas: selecionadas
+        .filter((n) => n.socioId === s.id)
+        .map((n) => ({
+          id: n.id,
+          tomador: n.tomador,
+          numero: n.numero,
+          valorBruto: n.valorBruto,
+          irRetPct: n.irRetPct,
+          issRetPct: n.issRetPct,
+        })),
+    }));
+
+    const calculados = calcularDemonstrativosPorSocio(
       { regime: cliente.regime, aliquotaSimplesMensal: cliente.aliquotaSimplesMensal },
-      selecionadas.map((n) => ({
-        id: n.id,
-        tomador: n.tomador,
-        numero: n.numero,
-        valorBruto: n.valorBruto,
-        irRetPct: n.irRetPct,
-        issRetPct: n.issRetPct,
-      })),
-      custosAtivos.map((c, i) => ({ id: String(i), ...c }))
+      grupos,
+      custosAtivos,
+      cliente.socios.length
     );
-    setResultado(r);
-    setCustosUsadosSnapshot(custosAtivos);
+
+    if (!calculados.length) {
+      showToast("Nenhuma NF incluída tem sócio identificado — atribua um sócio na tabela antes de calcular.");
+      return;
+    }
+
+    setResultados(calculados);
+    if (semSocio > 0) {
+      showToast(`${semSocio} NF(s) sem sócio identificado ficaram de fora — atribua um sócio e calcule de novo.`);
+    }
   }
 
   async function handleSalvarHistorico() {
-    const selecionadas = notas.filter((n) => n.incluido);
-    if (!resultado || !selecionadas.length) return;
+    if (!resultados || !resultados.length) return;
 
     setSaving(true);
     try {
-      const res = await fetch("/api/historico", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clienteId: cliente.id,
-          notaIds: selecionadas.map((n) => n.id),
-          custosUsados: custosUsadosSnapshot,
-        }),
-      });
-      if (!res.ok) throw new Error();
+      for (const r of resultados) {
+        const res = await fetch("/api/historico", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clienteId: cliente.id,
+            socioId: r.socioId,
+            notaIds: r.resultado.linhas.map((l) => l.notaFiscalId),
+            custosUsados: r.custosUsados,
+          }),
+        });
+        if (!res.ok) throw new Error();
+      }
 
-      const idsIncluidas = new Set(selecionadas.map((n) => n.id));
+      const idsIncluidas = new Set(resultados.flatMap((r) => r.resultado.linhas.map((l) => l.notaFiscalId)));
       setNotas((prev) =>
         prev.filter((n) => !idsIncluidas.has(n.id)).map((n) => ({ ...n, origem: "PENDENTE_ANTERIOR" as const }))
       );
-      setResultado(null);
-      showToast("Demonstrativo salvo no histórico. As notas não incluídas ficaram pendentes.");
+      setResultados(null);
+      showToast("Demonstrativo(s) salvos no histórico. As notas não incluídas ficaram pendentes.");
     } catch {
-      showToast("Não foi possível salvar o demonstrativo.");
+      showToast("Não foi possível salvar um ou mais demonstrativos.");
     } finally {
       setSaving(false);
     }
   }
-
-  const clienteInfo = useMemo(
-    () => ({
-      empresa: cliente.empresa,
-      profissional: cliente.profissional,
-      regime: cliente.regime,
-      aliquotaSimplesMensal: cliente.aliquotaSimplesMensal,
-    }),
-    [cliente]
-  );
 
   return (
     <>
@@ -219,7 +233,6 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
               {clientesLista.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.empresa}
-                  {c.profissional ? ` — ${c.profissional}` : ""}
                 </option>
               ))}
             </select>
@@ -232,7 +245,10 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
             {isSimples ? "Simples Nacional" : "Lucro Presumido"}
           </span>
           <br />
+          Sócios: {cliente.socios.map((s) => s.nome).join(", ") || "—"}
+          <br />
           Custo fixo mensal cadastrado: {brl(cliente.custosFixos.reduce((s, cf) => s + cf.valor, 0))}
+          {multiSocio && ` (dividido igualmente entre os ${cliente.socios.length} sócios)`}
           {isSimples && (
             <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
               <label style={{ fontSize: 11, fontWeight: 700, color: "var(--navy-dark)" }}>
@@ -262,7 +278,13 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
             + Adicionar NF manualmente
           </button>
         </div>
-        <NfTable notas={notas} isSimples={isSimples} onUpdate={handleUpdateNf} onRemove={handleRemoveNf} />
+        <NfTable
+          notas={notas}
+          isSimples={isSimples}
+          socios={cliente.socios}
+          onUpdate={handleUpdateNf}
+          onRemove={handleRemoveNf}
+        />
       </div>
 
       {notas.length > 0 && (
@@ -271,6 +293,7 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
           <div className="hint" style={{ marginBottom: 10 }}>
             Marque só o que deve ser descontado neste demonstrativo. Dá para editar valores, desmarcar itens ou
             lançar um custo extra que não fica salvo no cadastro do cliente.
+            {multiSocio && " O valor é dividido igualmente entre todos os sócios cadastrados."}
           </div>
           {custosSessao.length === 0 ? (
             <div className="empty">Nenhum custo fixo cadastrado para este cliente. Adicione um extra se precisar.</div>
@@ -308,6 +331,7 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
           </button>
           <div className="note" style={{ marginTop: 12 }}>
             Total a descontar neste demonstrativo: <b>{brl(totalCustosSessao)}</b>
+            {multiSocio && ` (${brl(totalCustosSessao / cliente.socios.length)} por sócio)`}
           </div>
         </div>
       )}
@@ -321,12 +345,31 @@ export function GerarWorkspace({ cliente, initialNotas, clientesLista }: Props) 
             </button>
           </div>
 
-          {resultado && (
+          {resultados && resultados.length > 0 && (
             <>
-              <DemonstrativoDocument cliente={clienteInfo} resultado={resultado} custosUsados={custosUsadosSnapshot} />
+              {resultados.map((r) => {
+                const clienteInfo = {
+                  empresa: cliente.empresa,
+                  profissional: r.socioNome,
+                  regime: cliente.regime,
+                  aliquotaSimplesMensal: cliente.aliquotaSimplesMensal,
+                };
+                return (
+                  <div key={r.socioId} style={{ marginBottom: 20 }}>
+                    <DemonstrativoDocument cliente={clienteInfo} resultado={r.resultado} custosUsados={r.custosUsados} />
+                    <div className="actions-bar no-print">
+                      <PrintButton />
+                      <ExportExcelButton
+                        cliente={clienteInfo}
+                        resultado={r.resultado}
+                        custosUsados={r.custosUsados}
+                        nomeArquivoBase={`${cliente.empresa}_${r.socioNome}`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
               <div className="actions-bar no-print">
-                <PrintButton />
-                <ExportExcelButton cliente={clienteInfo} resultado={resultado} custosUsados={custosUsadosSnapshot} />
                 <button className="btn orange" onClick={handleSalvarHistorico} disabled={saving}>
                   {saving ? "Salvando…" : "Salvar no histórico"}
                 </button>

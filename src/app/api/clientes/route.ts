@@ -6,7 +6,7 @@ import { requireStaffOrAdmin } from "@/lib/requireStaff";
 
 export async function GET() {
   const clientes = await prisma.cliente.findMany({
-    include: { custosFixos: true },
+    include: { custosFixos: true, socios: { where: { ativo: true }, orderBy: { createdAt: "asc" } } },
     orderBy: { empresa: "asc" },
   });
   return NextResponse.json(clientes.map(serializeCliente));
@@ -21,14 +21,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { custosFixos, ...clienteData } = parsed.data;
+  const { custosFixos, socios, ...clienteData } = parsed.data;
 
   const cliente = await prisma.cliente.create({
     data: {
       ...clienteData,
       custosFixos: { create: custosFixos },
+      socios: { create: socios.map((s) => ({ nome: s.nome })) },
     },
-    include: { custosFixos: true },
+    include: { custosFixos: true, socios: { where: { ativo: true }, orderBy: { createdAt: "asc" } } },
   });
 
   return NextResponse.json(serializeCliente(cliente), { status: 201 });

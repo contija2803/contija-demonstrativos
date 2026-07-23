@@ -8,6 +8,11 @@ interface CustoFixoDraft {
   valor: number;
 }
 
+interface SocioDraft {
+  id?: string;
+  nome: string;
+}
+
 interface Props {
   initial: ClienteJSON | null;
   onSaved: (cliente: ClienteJSON) => void;
@@ -18,9 +23,13 @@ function toDrafts(cliente: ClienteJSON | null): CustoFixoDraft[] {
   return cliente ? cliente.custosFixos.map((cf) => ({ desc: cf.desc, valor: cf.valor })) : [];
 }
 
+function toSocioDrafts(cliente: ClienteJSON | null): SocioDraft[] {
+  return cliente && cliente.socios.length ? cliente.socios.map((s) => ({ id: s.id, nome: s.nome })) : [{ nome: "" }];
+}
+
 export function ClienteForm({ initial, onSaved, onCancel }: Props) {
   const [empresa, setEmpresa] = useState(initial?.empresa ?? "");
-  const [profissional, setProfissional] = useState(initial?.profissional ?? "");
+  const [socios, setSocios] = useState<SocioDraft[]>(toSocioDrafts(initial));
   const [regime, setRegime] = useState<"PRESUMIDO" | "SIMPLES">(initial?.regime ?? "PRESUMIDO");
   const [aliquotaSimplesMensal, setAliquotaSimplesMensal] = useState(
     initial?.aliquotaSimplesMensal?.toString() ?? ""
@@ -31,7 +40,7 @@ export function ClienteForm({ initial, onSaved, onCancel }: Props) {
 
   useEffect(() => {
     setEmpresa(initial?.empresa ?? "");
-    setProfissional(initial?.profissional ?? "");
+    setSocios(toSocioDrafts(initial));
     setRegime(initial?.regime ?? "PRESUMIDO");
     setAliquotaSimplesMensal(initial?.aliquotaSimplesMensal?.toString() ?? "");
     setCustosFixos(toDrafts(initial));
@@ -47,12 +56,26 @@ export function ClienteForm({ initial, onSaved, onCancel }: Props) {
     setCustosFixos((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function updateSocio(index: number, nome: string) {
+    setSocios((prev) => prev.map((s, i) => (i === index ? { ...s, nome } : s)));
+  }
+
+  function removeSocio(index: number) {
+    setSocios((prev) => prev.filter((_, i) => i !== index));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
+    const sociosValidos = socios.filter((s) => s.nome.trim());
+
     if (!empresa.trim()) {
       setError("Informe o nome da empresa.");
+      return;
+    }
+    if (!sociosValidos.length) {
+      setError("Cadastre ao menos um sócio.");
       return;
     }
     if (regime === "SIMPLES" && !(Number(aliquotaSimplesMensal) > 0)) {
@@ -63,10 +86,10 @@ export function ClienteForm({ initial, onSaved, onCancel }: Props) {
     setSaving(true);
     const payload = {
       empresa: empresa.trim(),
-      profissional: profissional.trim(),
       regime,
       aliquotaSimplesMensal: regime === "SIMPLES" ? Number(aliquotaSimplesMensal) : null,
       custosFixos: custosFixos.filter((c) => c.desc.trim()),
+      socios: sociosValidos.map((s) => ({ id: s.id, nome: s.nome.trim() })),
     };
 
     const url = initial ? `/api/clientes/${initial.id}` : "/api/clientes";
@@ -86,7 +109,7 @@ export function ClienteForm({ initial, onSaved, onCancel }: Props) {
       onSaved(cliente);
       if (!initial) {
         setEmpresa("");
-        setProfissional("");
+        setSocios([{ nome: "" }]);
         setRegime("PRESUMIDO");
         setAliquotaSimplesMensal("");
         setCustosFixos([]);
@@ -109,14 +132,6 @@ export function ClienteForm({ initial, onSaved, onCancel }: Props) {
           <div className="field">
             <label>Nome da empresa (PJ)</label>
             <input value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Ex.: ACBS SAÚDE LTDA" />
-          </div>
-          <div className="field">
-            <label>Profissional / responsável</label>
-            <input
-              value={profissional}
-              onChange={(e) => setProfissional(e.target.value)}
-              placeholder="Ex.: Drª Ana Clara Barcelos"
-            />
           </div>
           <div className="field">
             <label>Regime tributário</label>
@@ -152,6 +167,30 @@ export function ClienteForm({ initial, onSaved, onCancel }: Props) {
             ? "Provisão do Simples = alíquota mensal atual − o que já foi retido na própria NF (a diferença). Atualize a alíquota mensal sempre que a faixa do DAS mudar."
             : "Provisão de IRPJ (Presumido) = 4,8% menos a alíquota de IR já retida na própria nota (a diferença). Provisão de CSLL = 1,88% fixo (2,88% total − 1% já retido na fonte)."}
         </div>
+
+        <h3>Sócios / profissionais</h3>
+        <div className="hint" style={{ marginBottom: 8 }}>
+          Se a empresa tiver mais de um sócio, o custo fixo mensal é dividido igualmente entre todos, e cada nota
+          fiscal é atribuída ao sócio correspondente (detectado pela descrição da nota, ou escolhido manualmente).
+        </div>
+        {socios.map((s, i) => (
+          <div className="custos-line" key={s.id ?? `novo-${i}`} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+            <input
+              placeholder="Ex.: Drª Ana Clara Barcelos"
+              style={{ flex: 2 }}
+              value={s.nome}
+              onChange={(e) => updateSocio(i, e.target.value)}
+            />
+            {socios.length > 1 && (
+              <button type="button" className="btn danger" onClick={() => removeSocio(i)}>
+                Remover
+              </button>
+            )}
+          </div>
+        ))}
+        <button type="button" className="btn ghost small" onClick={() => setSocios((prev) => [...prev, { nome: "" }])}>
+          + Adicionar sócio
+        </button>
 
         <h3>Custos fixos mensais</h3>
         {custosFixos.map((cf, i) => (
